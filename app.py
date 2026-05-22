@@ -1,11 +1,10 @@
 import streamlit as st
-import cv2
 import numpy as np
 import joblib
 
 from ultralytics import YOLO
 from huggingface_hub import hf_hub_download
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from utils import (
     extract_color_features,
@@ -13,9 +12,18 @@ from utils import (
     extract_shape_features
 )
 
-# =========================
+# =====================================
+# PAGE CONFIG
+# =====================================
+
+st.set_page_config(
+    page_title="Pill Classification",
+    layout="wide"
+)
+
+# =====================================
 # DOWNLOAD MODELS
-# =========================
+# =====================================
 
 YOLO_PATH = hf_hub_download(
     repo_id="ZunTM/pill-classification-hybrid",
@@ -27,17 +35,17 @@ RF_PATH = hf_hub_download(
     filename="random_forest.pkl"
 )
 
-# =========================
+# =====================================
 # LOAD MODELS
-# =========================
+# =====================================
 
 yolo_model = YOLO(YOLO_PATH)
 
 rf_model = joblib.load(RF_PATH)
 
-# =========================
+# =====================================
 # CLASS NAMES
-# =========================
+# =====================================
 
 class_names = [
     'Neozep',
@@ -52,33 +60,47 @@ class_names = [
     'DayZinc'
 ]
 
-# =========================
-# STREAMLIT UI
-# =========================
+# =====================================
+# TITLE
+# =====================================
 
 st.title(
     "Pill Identification and Classification"
 )
 
-uploaded_file = st.file_uploader(
-    "Upload Pill Image",
-    type=['jpg', 'jpeg', 'png']
+st.markdown(
+    """
+    Hybrid AI Framework using:
+    - YOLOv8s
+    - Random Forest
+    - Feature Fusion
+    """
 )
 
-# =========================
+# =====================================
+# FILE UPLOAD
+# =====================================
+
+uploaded_file = st.file_uploader(
+    "Upload Pill Image",
+    type=["jpg", "jpeg", "png"]
+)
+
+# =====================================
 # MAIN PIPELINE
-# =========================
+# =====================================
 
 if uploaded_file is not None:
 
-    image = Image.open(uploaded_file)
+    # =========================
+    # LOAD IMAGE
+    # =========================
 
-    img = np.array(image)
+    image = Image.open(
+        uploaded_file
+    ).convert("RGB")
 
-    img_rgb = cv2.cvtColor(
-        img,
-        cv2.COLOR_BGR2RGB
-    )
+    img_rgb = np.array(image)
 
     h_img, w_img = img_rgb.shape[:2]
 
@@ -93,6 +115,12 @@ if uploaded_file is not None:
         augment=True,
         verbose=False
     )
+
+    # =========================
+    # DRAW OBJECT
+    # =========================
+
+    draw = ImageDraw.Draw(image)
 
     # =========================
     # LOOP DETECTIONS
@@ -112,7 +140,9 @@ if uploaded_file is not None:
             pred_conf
         ):
 
-            pred_box = list(map(int, pred_box))
+            pred_box = list(
+                map(int, pred_box)
+            )
 
             x1, y1, x2, y2 = pred_box
 
@@ -127,36 +157,51 @@ if uploaded_file is not None:
             y2 = min(h_img, y2)
 
             # =========================
-            # ROI CROP
+            # CROP ROI
             # =========================
 
-            crop = img_rgb[y1:y2, x1:x2]
+            crop = img_rgb[
+                y1:y2,
+                x1:x2
+            ]
 
             if crop.size == 0:
                 continue
 
-            if crop.shape[0] < 8 or crop.shape[1] < 8:
+            if (
+                crop.shape[0] < 8
+                or crop.shape[1] < 8
+            ):
                 continue
 
-            crop = cv2.resize(
-                crop,
+            # =========================
+            # RESIZE
+            # =========================
+
+            crop_pil = Image.fromarray(
+                crop
+            )
+
+            crop_pil = crop_pil.resize(
                 (128,128)
             )
+
+            crop = np.array(crop_pil)
 
             # =========================
             # FEATURE EXTRACTION
             # =========================
 
-            color_feature = extract_color_features(
-                crop
+            color_feature = (
+                extract_color_features(crop)
             )
 
-            texture_feature = extract_lbp_features(
-                crop
+            texture_feature = (
+                extract_lbp_features(crop)
             )
 
-            shape_feature = extract_shape_features(
-                crop
+            shape_feature = (
+                extract_shape_features(crop)
             )
 
             final_feature = np.concatenate([
@@ -165,22 +210,27 @@ if uploaded_file is not None:
                 shape_feature
             ])
 
-            final_feature = final_feature.reshape(
-                1,
-                -1
+            final_feature = (
+                final_feature.reshape(1,-1)
             )
 
             # =========================
             # RF PREDICTION
             # =========================
 
-            rf_probs = rf_model.predict_proba(
-                final_feature
-            )[0]
+            rf_probs = (
+                rf_model.predict_proba(
+                    final_feature
+                )[0]
+            )
 
-            rf_pred = np.argmax(rf_probs)
+            rf_pred = np.argmax(
+                rf_probs
+            )
 
-            rf_conf = np.max(rf_probs)
+            rf_conf = np.max(
+                rf_probs
+            )
 
             # =========================
             # FUSION LOGIC
@@ -188,15 +238,20 @@ if uploaded_file is not None:
 
             if conf >= 0.95:
 
-                final_pred = int(yolo_cls)
+                final_pred = int(
+                    yolo_cls
+                )
 
             elif (
                 conf >= 0.60
-                and int(yolo_cls) == int(rf_pred)
+                and int(yolo_cls)
+                == int(rf_pred)
                 and rf_conf >= 0.60
             ):
 
-                final_pred = int(yolo_cls)
+                final_pred = int(
+                    yolo_cls
+                )
 
             else:
 
@@ -210,34 +265,27 @@ if uploaded_file is not None:
             # DRAW BOX
             # =========================
 
-            cv2.rectangle(
-                img_rgb,
-                (x1, y1),
-                (x2, y2),
-                (0,255,0),
-                3
+            draw.rectangle(
+                [
+                    (x1,y1),
+                    (x2,y2)
+                ],
+                outline="lime",
+                width=4
             )
 
-            label = (
-                f"{final_name}"
-            )
-
-            cv2.putText(
-                img_rgb,
-                label,
-                (x1, y1-10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (255,0,0),
-                2
+            draw.text(
+                (x1, y1-20),
+                final_name,
+                fill="red"
             )
 
     # =========================
-    # SHOW RESULT
+    # SHOW IMAGE
     # =========================
 
     st.image(
-        img_rgb,
+        image,
         caption="Prediction Result",
         use_container_width=True
     )
