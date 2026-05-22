@@ -1,9 +1,12 @@
 import streamlit as st
 import cv2
 import numpy as np
-from ultralytics import YOLO
 import joblib
+
+from ultralytics import YOLO
+from huggingface_hub import hf_hub_download
 from PIL import Image
+
 from utils import (
     extract_color_features,
     extract_lbp_features,
@@ -11,12 +14,26 @@ from utils import (
 )
 
 # =========================
+# DOWNLOAD MODELS
+# =========================
+
+YOLO_PATH = hf_hub_download(
+    repo_id="ZunTM/pill-classification-hybrid",
+    filename="best.pt"
+)
+
+RF_PATH = hf_hub_download(
+    repo_id="ZunTM/pill-classification-hybrid",
+    filename="random_forest.pkl"
+)
+
+# =========================
 # LOAD MODELS
 # =========================
 
-yolo_model = YOLO('best.pt')
+yolo_model = YOLO(YOLO_PATH)
 
-rf_model = joblib.load('random_forest.pkl')
+rf_model = joblib.load(RF_PATH)
 
 # =========================
 # CLASS NAMES
@@ -39,12 +56,18 @@ class_names = [
 # STREAMLIT UI
 # =========================
 
-st.title("Pill Identification and Classification")
+st.title(
+    "Pill Identification and Classification"
+)
 
 uploaded_file = st.file_uploader(
-    "Upload an image",
+    "Upload Pill Image",
     type=['jpg', 'jpeg', 'png']
 )
+
+# =========================
+# MAIN PIPELINE
+# =========================
 
 if uploaded_file is not None:
 
@@ -52,7 +75,10 @@ if uploaded_file is not None:
 
     img = np.array(image)
 
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_rgb = cv2.cvtColor(
+        img,
+        cv2.COLOR_BGR2RGB
+    )
 
     h_img, w_img = img_rgb.shape[:2]
 
@@ -62,10 +88,15 @@ if uploaded_file is not None:
 
     results = yolo_model.predict(
         source=img_rgb,
-        conf=0.1,
-        imgsz=640,
+        conf=0.10,
+        imgsz=1280,
+        augment=True,
         verbose=False
     )
+
+    # =========================
+    # LOOP DETECTIONS
+    # =========================
 
     for r in results:
 
@@ -85,31 +116,48 @@ if uploaded_file is not None:
 
             x1, y1, x2, y2 = pred_box
 
+            # =========================
+            # CLAMP
+            # =========================
+
             x1 = max(0, x1)
             y1 = max(0, y1)
 
             x2 = min(w_img, x2)
             y2 = min(h_img, y2)
 
+            # =========================
+            # ROI CROP
+            # =========================
+
             crop = img_rgb[y1:y2, x1:x2]
 
             if crop.size == 0:
                 continue
 
-            if crop.shape[0] < 10 or crop.shape[1] < 10:
+            if crop.shape[0] < 8 or crop.shape[1] < 8:
                 continue
 
-            crop = cv2.resize(crop, (128,128))
+            crop = cv2.resize(
+                crop,
+                (128,128)
+            )
 
             # =========================
             # FEATURE EXTRACTION
             # =========================
 
-            color_feature = extract_color_features(crop)
+            color_feature = extract_color_features(
+                crop
+            )
 
-            texture_feature = extract_lbp_features(crop)
+            texture_feature = extract_lbp_features(
+                crop
+            )
 
-            shape_feature = extract_shape_features(crop)
+            shape_feature = extract_shape_features(
+                crop
+            )
 
             final_feature = np.concatenate([
                 color_feature,
@@ -117,7 +165,10 @@ if uploaded_file is not None:
                 shape_feature
             ])
 
-            final_feature = final_feature.reshape(1, -1)
+            final_feature = final_feature.reshape(
+                1,
+                -1
+            )
 
             # =========================
             # RF PREDICTION
@@ -151,7 +202,9 @@ if uploaded_file is not None:
 
                 continue
 
-            final_name = class_names[int(final_pred)]
+            final_name = class_names[
+                int(final_pred)
+            ]
 
             # =========================
             # DRAW BOX
@@ -165,9 +218,13 @@ if uploaded_file is not None:
                 3
             )
 
+            label = (
+                f"{final_name}"
+            )
+
             cv2.putText(
                 img_rgb,
-                final_name,
+                label,
                 (x1, y1-10),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,
@@ -175,8 +232,12 @@ if uploaded_file is not None:
                 2
             )
 
+    # =========================
+    # SHOW RESULT
+    # =========================
+
     st.image(
         img_rgb,
-        caption='Prediction Result',
+        caption="Prediction Result",
         use_container_width=True
     )
