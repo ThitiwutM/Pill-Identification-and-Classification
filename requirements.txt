@@ -1,9 +1,9 @@
 streamlit
 ultralytics
-opencv-python
+opencv-python-headless
 numpy
-matplotlib
 scikit-image
 scikit-learn
 joblib
 Pillow
+huggingface_hub
