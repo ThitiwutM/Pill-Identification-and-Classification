@@ -1,29 +1,46 @@
-import cv2
 import numpy as np
-from skimage.feature import local_binary_pattern
+
+from PIL import Image
+
+from skimage.color import rgb2gray
+
+from skimage.feature import (
+    local_binary_pattern,
+    canny
+)
+
+# =========================
+# COLOR FEATURES
+# =========================
 
 def extract_color_features(image):
 
-    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    image = image.astype(np.float32) / 255.0
 
-    hist_h = cv2.calcHist([hsv],[0],None,[32],[0,256])
-    hist_s = cv2.calcHist([hsv],[1],None,[32],[0,256])
-    hist_v = cv2.calcHist([hsv],[2],None,[32],[0,256])
+    mean_rgb = np.mean(
+        image,
+        axis=(0,1)
+    )
+
+    std_rgb = np.std(
+        image,
+        axis=(0,1)
+    )
 
     feature = np.concatenate([
-        hist_h.flatten(),
-        hist_s.flatten(),
-        hist_v.flatten()
+        mean_rgb,
+        std_rgb
     ])
-
-    feature = feature / np.sum(feature)
 
     return feature
 
+# =========================
+# TEXTURE FEATURES
+# =========================
 
 def extract_lbp_features(image):
 
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    gray = rgb2gray(image)
 
     lbp = local_binary_pattern(
         gray,
@@ -34,24 +51,27 @@ def extract_lbp_features(image):
 
     hist, _ = np.histogram(
         lbp.ravel(),
-        bins=np.arange(0, 11),
-        range=(0, 10)
+        bins=np.arange(0,11),
+        range=(0,10)
     )
 
-    hist = hist.astype('float')
+    hist = hist.astype("float")
 
     hist /= (hist.sum() + 1e-6)
 
     return hist
 
+# =========================
+# SHAPE FEATURES
+# =========================
 
 def extract_shape_features(image):
 
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    gray = rgb2gray(image)
 
-    edges = cv2.Canny(gray, 100, 200)
+    edges = canny(gray)
 
-    edge_density = np.sum(edges > 0) / edges.size
+    edge_density = np.mean(edges)
 
     h, w = gray.shape
 
