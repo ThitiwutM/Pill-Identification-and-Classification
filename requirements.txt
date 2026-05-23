@@ -1,9 +1,7 @@
 streamlit
 ultralytics
+opencv-python-headless
 numpy
-scikit-image
-scikit-learn
-joblib
 Pillow
 huggingface_hub
 torch
