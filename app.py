@@ -59,10 +59,6 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
 
-    # =====================================
-    # READ IMAGE
-    # =====================================
-
     image = Image.open(
         uploaded_file
     ).convert("RGB")
@@ -75,10 +71,8 @@ if uploaded_file is not None:
 
     results = model.predict(
         source=img,
-        conf=0.9,
-        iou=0.30,
-        imgsz=1280,
-        augment=True,
+        conf=0.50,
+        iou=0.45,
         verbose=False
     )
 
