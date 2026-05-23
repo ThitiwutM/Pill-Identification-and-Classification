@@ -87,7 +87,7 @@ if uploaded_file is not None:
 
     results = model.predict(
         source=temp_path,
-        conf=0.25,
+        conf=0.9,
         iou=0.45,
         verbose=False
     )
