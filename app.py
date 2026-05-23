@@ -4,7 +4,7 @@ import numpy as np
 from ultralytics import YOLO
 from huggingface_hub import hf_hub_download
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 # =====================================
 # PAGE CONFIG
@@ -38,6 +38,16 @@ st.title(
     "Pill Identification using YOLOv8s"
 )
 
+st.markdown(
+    """
+    Upload an image for pill detection and classification
+    """
+)
+
+# =====================================
+# FILE UPLOADER
+# =====================================
+
 uploaded_file = st.file_uploader(
     "Upload Image",
     type=["jpg", "jpeg", "png"]
@@ -48,6 +58,10 @@ uploaded_file = st.file_uploader(
 # =====================================
 
 if uploaded_file is not None:
+
+    # =====================================
+    # READ IMAGE
+    # =====================================
 
     image = Image.open(
         uploaded_file
@@ -61,60 +75,29 @@ if uploaded_file is not None:
 
     results = model.predict(
         source=img,
-        conf=0.85,
+        conf=0.25,
+        iou=0.30,
         imgsz=1280,
         augment=True,
         verbose=False
     )
 
     # =====================================
-    # DRAW BOXES MANUALLY
+    # DRAW RESULTS
     # =====================================
 
-    draw = ImageDraw.Draw(image)
-
-    for r in results:
-
-        boxes = r.boxes.xyxy.cpu().numpy()
-
-        classes = r.boxes.cls.cpu().numpy()
-
-        confs = r.boxes.conf.cpu().numpy()
-
-        for box, cls, conf in zip(
-            boxes,
-            classes,
-            confs
-        ):
-
-            x1, y1, x2, y2 = map(int, box)
-
-            label = (
-                f"{model.names[int(cls)]}"
-            )
-
-            # DRAW BOX
-
-            draw.rectangle(
-                [(x1,y1),(x2,y2)],
-                outline="lime",
-                width=4
-            )
-
-            # DRAW TEXT
-
-            draw.text(
-                (x1, y1-20),
-                label,
-                fill="red"
-            )
+    plotted = results[0].plot(
+        conf=False,
+        line_width=2,
+        font_size=10
+    )
 
     # =====================================
-    # SHOW ORIGINAL IMAGE
+    # SHOW IMAGE
     # =====================================
 
     st.image(
-        image,
+        plotted,
         caption="Detection Result",
         use_container_width=True
     )
