@@ -1,5 +1,6 @@
 import streamlit as st
 import numpy as np
+import tempfile
 
 from ultralytics import YOLO
 from huggingface_hub import hf_hub_download
@@ -59,19 +60,34 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
 
+    # =====================================
+    # READ IMAGE
+    # =====================================
+
     image = Image.open(
         uploaded_file
     ).convert("RGB")
 
-    img = np.array(image)
+    # =====================================
+    # SAVE TEMP FILE
+    # =====================================
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".jpg",
+        delete=False
+    ) as tmp:
+
+        image.save(tmp.name)
+
+        temp_path = tmp.name
 
     # =====================================
     # YOLO PREDICTION
     # =====================================
 
     results = model.predict(
-        source=img,
-        conf=0.50,
+        source=temp_path,
+        conf=0.25,
         iou=0.45,
         verbose=False
     )
@@ -81,13 +97,13 @@ if uploaded_file is not None:
     # =====================================
 
     plotted = results[0].plot(
-        conf=False,
+        conf=True,
         line_width=2,
         font_size=10
     )
 
     # =====================================
-    # SHOW IMAGE
+    # SHOW RESULT
     # =====================================
 
     st.image(
