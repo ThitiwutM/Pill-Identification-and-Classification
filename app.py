@@ -61,7 +61,7 @@ if uploaded_file is not None:
 
     results = model.predict(
         source=img,
-        conf=0.8,
+        conf=0.9,
         imgsz=1280,
         augment=True,
         verbose=False
