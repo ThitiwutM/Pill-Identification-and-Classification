@@ -102,6 +102,8 @@ if uploaded_file is not None:
         font_size=10
     )
 
+    plotted = plotted[:, :, ::-1]
+
     # =====================================
     # SHOW RESULT
     # =====================================
