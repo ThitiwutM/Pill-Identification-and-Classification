@@ -4,7 +4,7 @@ import numpy as np
 from ultralytics import YOLO
 from huggingface_hub import hf_hub_download
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 # =====================================
 # PAGE CONFIG
@@ -38,16 +38,6 @@ st.title(
     "Pill Identification using YOLOv8s"
 )
 
-st.markdown(
-    """
-    Upload an image for pill detection and classification
-    """
-)
-
-# =====================================
-# FILE UPLOADER
-# =====================================
-
 uploaded_file = st.file_uploader(
     "Upload Image",
     type=["jpg", "jpeg", "png"]
@@ -74,21 +64,55 @@ if uploaded_file is not None:
         conf=0.90,
         verbose=False
     )
-    
-    # =====================================
-    # DRAW RESULTS
-    # =====================================
-
-    plotted = results[0].plot()
-
-    plotted = plotted[..., ::-1]
 
     # =====================================
-    # SHOW IMAGE
+    # DRAW BOXES MANUALLY
+    # =====================================
+
+    draw = ImageDraw.Draw(image)
+
+    for r in results:
+
+        boxes = r.boxes.xyxy.cpu().numpy()
+
+        classes = r.boxes.cls.cpu().numpy()
+
+        confs = r.boxes.conf.cpu().numpy()
+
+        for box, cls, conf in zip(
+            boxes,
+            classes,
+            confs
+        ):
+
+            x1, y1, x2, y2 = map(int, box)
+
+            label = (
+                f"{model.names[int(cls)]}"
+            )
+
+            # DRAW BOX
+
+            draw.rectangle(
+                [(x1,y1),(x2,y2)],
+                outline="lime",
+                width=4
+            )
+
+            # DRAW TEXT
+
+            draw.text(
+                (x1, y1-20),
+                label,
+                fill="red"
+            )
+
+    # =====================================
+    # SHOW ORIGINAL IMAGE
     # =====================================
 
     st.image(
-        plotted,
+        image,
         caption="Detection Result",
         use_container_width=True
     )
